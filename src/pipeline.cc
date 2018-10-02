@@ -288,25 +288,22 @@ class PipelineWorker : public Napi::AsyncWorker {
       }
 
       // Ensure we're using a device-independent colour space
-      if (
-        sharp::HasProfile(image) &&
-        image.interpretation() != VIPS_INTERPRETATION_LABS &&
-        image.interpretation() != VIPS_INTERPRETATION_GREY16
-      ) {
-        // Convert to sRGB using embedded profile
-        try {
-          image = image.icc_transform("srgb", VImage::option()
-            ->set("embedded", TRUE)
-            ->set("depth", image.interpretation() == VIPS_INTERPRETATION_RGB16 ? 16 : 8)
-            ->set("intent", VIPS_INTENT_PERCEPTUAL));
-        } catch(...) {
-          // Ignore failure of embedded profile
-        }
-      } else if (image.interpretation() == VIPS_INTERPRETATION_CMYK) {
-        image = image.icc_transform("srgb", VImage::option()
-          ->set("input_profile", "cmyk")
-          ->set("intent", VIPS_INTENT_PERCEPTUAL));
-      }
+      // if (sharp::HasProfile(image)) {
+      //   // Convert to sRGB using embedded profile
+      //   try {
+      //     image = image.icc_transform(
+      //       const_cast<char*>(profileMap[VIPS_INTERPRETATION_sRGB].data()), VImage::option()
+      //       ->set("embedded", TRUE)
+      //       ->set("intent", VIPS_INTENT_PERCEPTUAL));
+      //   } catch(...) {
+      //     // Ignore failure of embedded profile
+      //   }
+      // } else if (image.interpretation() == VIPS_INTERPRETATION_CMYK) {
+      //   image = image.icc_transform(
+      //     const_cast<char*>(profileMap[VIPS_INTERPRETATION_sRGB].data()), VImage::option()
+      //     ->set("input_profile", profileMap[VIPS_INTERPRETATION_CMYK].data())
+      //     ->set("intent", VIPS_INTENT_PERCEPTUAL));
+      // }
 
       // Flatten image to remove alpha channel
       if (baton->flatten && sharp::HasAlpha(image)) {
