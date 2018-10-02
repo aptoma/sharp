@@ -1,9 +1,9 @@
 {
-  "name": "sharp",
+  "name": "@aptoma/sharp",
   "description": "High performance Node.js image processing, the fastest module to resize JPEG, PNG, WebP and TIFF images",
-  "version": "0.20.8",
+  "version": "0.21.0-beta",
   "author": "Lovell Fuller <npm@lovell.info>",
-  "homepage": "https://github.com/lovell/sharp",
+  "homepage": "https://github.com/aptoma/sharp",
   "contributors": [
     "Pierre Inglebert <pierre.inglebert@gmail.com>",
     "Jonathan Ong <jonathanrichardong@gmail.com>",
@@ -67,7 +67,7 @@
   "main": "lib/index.js",
   "repository": {
     "type": "git",
-    "url": "git://github.com/lovell/sharp"
+    "url": "git://github.com/aptoma/sharp"
   },
   "keywords": [
     "jpeg",
