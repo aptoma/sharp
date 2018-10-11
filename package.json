@@ -1,7 +1,7 @@
 {
   "name": "@aptoma/sharp",
   "description": "High performance Node.js image processing, the fastest module to resize JPEG, PNG, WebP and TIFF images",
-  "version": "0.21.0-beta",
+  "version": "0.21.1-beta",
   "author": "Lovell Fuller <npm@lovell.info>",
   "homepage": "https://github.com/aptoma/sharp",
   "contributors": [
@@ -114,7 +114,7 @@
   },
   "license": "Apache-2.0",
   "config": {
-    "libvips": "8.6.1"
+    "libvips": "8.7.0"
   },
   "engines": {
     "node": ">=4.5.0"
