@@ -59,12 +59,12 @@ describe('Image channel extraction', function () {
     sharp(fixtures.inputJpg)
       .toColourspace('lch')
       .extractChannel(1)
-      .resize(320, 240)
+      .resize(320, 240, { fastShrinkOnLoad: false })
       .toFile(output, function (err, info) {
         if (err) throw err;
         assert.strictEqual(320, info.width);
         assert.strictEqual(240, info.height);
-        fixtures.assertMaxColourDistance(output, fixtures.expected('extract-lch.jpg'));
+        fixtures.assertMaxColourDistance(output, fixtures.expected('extract-lch.jpg'), 9);
         done();
       });
   });

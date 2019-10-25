@@ -22,15 +22,21 @@ Returns **Sharp**
 ## metadata
 
 Fast access to (uncached) image metadata without decoding any compressed image data.
-A Promises/A+ promise is returned when `callback` is not provided.
+A `Promise` is returned when `callback` is not provided.
 
 -   `format`: Name of decoder used to decompress image data e.g. `jpeg`, `png`, `webp`, `gif`, `svg`
+-   `size`: Total size of image in bytes, for Stream and Buffer input only
 -   `width`: Number of pixels wide (EXIF orientation is not taken into consideration)
 -   `height`: Number of pixels high (EXIF orientation is not taken into consideration)
 -   `space`: Name of colour space interpretation e.g. `srgb`, `rgb`, `cmyk`, `lab`, `b-w` [...][1]
 -   `channels`: Number of bands e.g. `3` for sRGB, `4` for CMYK
 -   `depth`: Name of pixel depth format e.g. `uchar`, `char`, `ushort`, `float` [...][2]
 -   `density`: Number of pixels per inch (DPI), if present
+-   `chromaSubsampling`: String containing JPEG chroma subsampling, `4:2:0` or `4:4:4` for RGB, `4:2:0:4` or `4:4:4:4` for CMYK
+-   `isProgressive`: Boolean indicating whether the image is interlaced using a progressive scan
+-   `pages`: Number of pages/frames contained within the image, with support for TIFF, HEIF, PDF, animated GIF and animated WebP
+-   `pageHeight`: Number of pixels high each page in this PDF image will be.
+-   `pagePrimary`: Number of the primary page in a HEIF image
 -   `hasProfile`: Boolean indicating the presence of an embedded ICC profile
 -   `hasAlpha`: Boolean indicating the presence of an alpha transparency channel
 -   `orientation`: Number value of the EXIF Orientation header, if present
@@ -65,7 +71,7 @@ Returns **([Promise][5]&lt;[Object][6]> | Sharp)**
 ## stats
 
 Access to pixel-derived image statistics for every channel in the image.
-A Promise is returned when `callback` is not provided.
+A `Promise` is returned when `callback` is not provided.
 
 -   `channels`: Array of channel statistics for each channel in the image. Each channel statistic contains
     -   `min` (minimum value in the channel)
@@ -100,9 +106,9 @@ Returns **[Promise][5]&lt;[Object][6]>**
 
 ## limitInputPixels
 
-Do not process input images where the number of pixels (width _ height) exceeds this limit.
+Do not process input images where the number of pixels (width x height) exceeds this limit.
 Assumes image dimensions contained in the input metadata can be trusted.
-The default limit is 268402689 (0x3FFF _ 0x3FFF) pixels.
+The default limit is 268402689 (0x3FFF x 0x3FFF) pixels.
 
 ### Parameters
 
@@ -126,9 +132,9 @@ The default behaviour _before_ function call is `false`, meaning the libvips acc
 
 Returns **Sharp** 
 
-[1]: https://github.com/jcupitt/libvips/blob/master/libvips/iofuncs/enumtypes.c#L636
+[1]: https://github.com/libvips/libvips/blob/master/libvips/iofuncs/enumtypes.c#L636
 
-[2]: https://github.com/jcupitt/libvips/blob/master/libvips/iofuncs/enumtypes.c#L672
+[2]: https://github.com/libvips/libvips/blob/master/libvips/iofuncs/enumtypes.c#L672
 
 [3]: https://www.npmjs.com/package/icc
 
