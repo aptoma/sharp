@@ -214,7 +214,27 @@ describe('Input/output', function () {
     });
   });
 
-  it('Sequential read, force JPEG', function (done) {
+  it('Invalid sequential read option throws', () => {
+    assert.throws(() => {
+      sharp({ sequentialRead: 'fail' });
+    }, /Expected boolean for sequentialRead but received fail of type string/);
+  });
+
+  it('Sequential read, force JPEG', () =>
+    sharp(fixtures.inputJpg, { sequentialRead: true })
+      .resize(320, 240)
+      .toFormat(sharp.format.jpeg)
+      .toBuffer({ resolveWithObject: true })
+      .then(({ data, info }) => {
+        assert.strictEqual(data.length > 0, true);
+        assert.strictEqual(data.length, info.size);
+        assert.strictEqual(info.format, 'jpeg');
+        assert.strictEqual(info.width, 320);
+        assert.strictEqual(info.height, 240);
+      })
+  );
+
+  it('Sequential read, force JPEG - deprecated', function (done) {
     sharp(fixtures.inputJpg)
       .sequentialRead()
       .resize(320, 240)
@@ -230,7 +250,21 @@ describe('Input/output', function () {
       });
   });
 
-  it('Not sequential read, force JPEG', function (done) {
+  it('Not sequential read, force JPEG', () =>
+    sharp(fixtures.inputJpg, { sequentialRead: false })
+      .resize(320, 240)
+      .toFormat('jpeg')
+      .toBuffer({ resolveWithObject: true })
+      .then(({ data, info }) => {
+        assert.strictEqual(data.length > 0, true);
+        assert.strictEqual(data.length, info.size);
+        assert.strictEqual(info.format, 'jpeg');
+        assert.strictEqual(info.width, 320);
+        assert.strictEqual(info.height, 240);
+      })
+  );
+
+  it('Not sequential read, force JPEG - deprecated', function (done) {
     sharp(fixtures.inputJpg)
       .sequentialRead(false)
       .resize(320, 240)
@@ -559,7 +593,67 @@ describe('Input/output', function () {
       });
   });
 
-  describe('Limit pixel count of input image', function () {
+  describe('Limit pixel count of input image', () => {
+    it('Invalid fails - negative', () => {
+      assert.throws(() => {
+        sharp({ limitInputPixels: -1 });
+      });
+    });
+
+    it('Invalid fails - float', () => {
+      assert.throws(() => {
+        sharp({ limitInputPixels: 12.3 });
+      });
+    });
+
+    it('Invalid fails - string', () => {
+      assert.throws(() => {
+        sharp({ limitInputPixels: 'fail' });
+      });
+    });
+
+    it('Same size as input works', () =>
+      sharp(fixtures.inputJpg)
+        .metadata()
+        .then(({ width, height }) =>
+          sharp(fixtures.inputJpg, { limitInputPixels: width * height }).toBuffer()
+        )
+    );
+
+    it('Disabling limit works', () =>
+      sharp(fixtures.inputJpgLarge, { limitInputPixels: false })
+        .resize(2)
+        .toBuffer()
+    );
+
+    it('Enabling default limit works and fails with a large image', () =>
+      sharp(fixtures.inputJpgLarge, { limitInputPixels: true })
+        .toBuffer()
+        .then(() => {
+          assert.fail('Expected to fail');
+        })
+        .catch(err => {
+          assert.strictEqual(err.message, 'Input image exceeds pixel limit');
+        })
+    );
+
+    it('Smaller than input fails', () =>
+      sharp(fixtures.inputJpg)
+        .metadata()
+        .then(({ width, height }) =>
+          sharp(fixtures.inputJpg, { limitInputPixels: width * height - 1 })
+            .toBuffer()
+            .then(() => {
+              assert.fail('Expected to fail');
+            })
+            .catch(err => {
+              assert.strictEqual(err.message, 'Input image exceeds pixel limit');
+            })
+        )
+    );
+  });
+
+  describe('Limit pixel count of input image - deprecated', function () {
     it('Invalid fails - negative', function (done) {
       let isValid = false;
       try {
@@ -635,18 +729,41 @@ describe('Input/output', function () {
   });
 
   describe('Input options', function () {
+    it('Option-less', function () {
+      sharp();
+    });
+    it('Ignore unknown attribute', function () {
+      sharp({ unknown: true });
+    });
+    it('undefined with options fails', function () {
+      assert.throws(function () {
+        sharp(undefined, {});
+      }, /Unsupported input 'undefined' of type undefined when also providing options of type object/);
+    });
+    it('null with options fails', function () {
+      assert.throws(function () {
+        sharp(null, {});
+      }, /Unsupported input 'null' of type object when also providing options of type object/);
+    });
     it('Non-Object options fails', function () {
       assert.throws(function () {
-        sharp(null, 'zoinks');
-      });
+        sharp('test', 'zoinks');
+      }, /Invalid input options zoinks/);
     });
     it('Invalid density: string', function () {
       assert.throws(function () {
-        sharp(null, { density: 'zoinks' });
-      });
+        sharp({ density: 'zoinks' });
+      }, /Expected number between 1 and 2400 for density but received zoinks of type string/);
     });
-    it('Ignore unknown attribute', function () {
-      sharp(null, { unknown: true });
+    it('Invalid page property throws', function () {
+      assert.throws(function () {
+        sharp({ page: -1 });
+      }, /Expected integer between 0 and 100000 for page but received -1 of type number/);
+    });
+    it('Invalid pages property throws', function () {
+      assert.throws(function () {
+        sharp({ pages: '1' });
+      }, /Expected integer between -1 and 100000 for pages but received 1 of type string/);
     });
   });
 
@@ -739,7 +856,7 @@ describe('Input/output', function () {
         assert.strictEqual(472, info.height);
         assert.strictEqual(3, info.channels);
       });
-    const badPipeline = sharp(null, { raw: { width: 840, height: 500, channels: 3 } })
+    const badPipeline = sharp({ raw: { width: 840, height: 500, channels: 3 } })
       .toFormat('jpeg')
       .toBuffer(function (err, data, info) {
         assert.strictEqual(err.message.indexOf('memory area too small') > 0, true);
@@ -747,7 +864,7 @@ describe('Input/output', function () {
         const inPipeline = sharp()
           .resize(840, 472)
           .raw();
-        const goodPipeline = sharp(null, { raw: { width: 840, height: 472, channels: 3 } })
+        const goodPipeline = sharp({ raw: { width: 840, height: 472, channels: 3 } })
           .toFormat('jpeg')
           .toBuffer(function (err, data, info) {
             if (err) throw err;

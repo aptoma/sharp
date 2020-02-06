@@ -11,7 +11,9 @@ Did you see the [documentation relating to installation](https://sharp.pixelplum
 
 Have you ensured the platform and version of Node.js used for `npm install` is the same as the platform and version of Node.js used at runtime?
 
-If you're (mis)using `sudo npm install` have you tried with the `sudo npm install --unsafe-perm` flag?
+If you are installing as a `root` or `sudo` user, have you tried with the `npm install --unsafe-perm` flag?
+
+If you are using the `ignore-scripts` feature of `npm`, have you tried with the `npm install --ignore-scripts=false` flag?
 
 What is the complete output of running `npm install --verbose sharp`? Have you checked this output for useful error messages?
 

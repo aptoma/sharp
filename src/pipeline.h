@@ -1,4 +1,4 @@
-// Copyright 2013, 2014, 2015, 2016, 2017, 2018, 2019 Lovell Fuller and contributors.
+// Copyright 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020 Lovell Fuller and contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,7 +55,6 @@ struct Composite {
 
 struct PipelineBaton {
   sharp::InputDescriptor *input;
-  int limitInputPixels;
   std::string formatOut;
   std::string fileOut;
   void *bufferOut;
@@ -119,7 +118,6 @@ struct PipelineBaton {
   int extendRight;
   std::vector<double> extendBackground;
   bool withoutEnlargement;
-  VipsAccess accessMethod;
   int jpegQuality;
   bool jpegProgressive;
   std::string jpegChromaSubsampling;
@@ -175,13 +173,13 @@ struct PipelineBaton {
   VipsForeignDzLayout tileLayout;
   std::string tileFormat;
   int tileAngle;
+  std::vector<double> tileBackground;
   int tileSkipBlanks;
   VipsForeignDzDepth tileDepth;
   std::unique_ptr<double[]> recombMatrix;
 
   PipelineBaton():
     input(nullptr),
-    limitInputPixels(0),
     bufferOutLength(0),
     topOffsetPre(-1),
     topOffsetPost(-1),
@@ -280,6 +278,7 @@ struct PipelineBaton {
     tileContainer(VIPS_FOREIGN_DZ_CONTAINER_FS),
     tileLayout(VIPS_FOREIGN_DZ_LAYOUT_DZ),
     tileAngle(0),
+    tileBackground{ 255.0, 255.0, 255.0, 255.0 },
     tileSkipBlanks(-1),
     tileDepth(VIPS_FOREIGN_DZ_DEPTH_LAST) {}
 };

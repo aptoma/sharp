@@ -6,11 +6,16 @@
 
 -   `input` **([Buffer][1] \| [String][2])?** if present, can be
      a Buffer containing JPEG, PNG, WebP, GIF, SVG, TIFF or raw pixel image data, or
-     a String containing the path to an JPEG, PNG, WebP, GIF, SVG or TIFF image file.
+     a String containing the filesystem path to an JPEG, PNG, WebP, GIF, SVG or TIFF image file.
      JPEG, PNG, WebP, GIF, SVG, TIFF or raw pixel image data can be streamed into the object when not present.
 -   `options` **[Object][3]?** if present, is an Object with optional attributes.
     -   `options.failOnError` **[Boolean][4]** by default halt processing and raise an error when loading invalid images.
          Set this flag to `false` if you'd rather apply a "best effort" to decode images, even if the data is corrupt or invalid. (optional, default `true`)
+    -   `options.limitInputPixels` **([Number][5] \| [Boolean][4])** Do not process input images where the number of pixels
+         (width x height) exceeds this limit. Assumes image dimensions contained in the input metadata can be trusted.
+         An integral Number of pixels, zero or false to remove limit, true to use default limit of 268402689 (0x3FFF x 0x3FFF). (optional, default `268402689`)
+    -   `options.sequentialRead` **[Boolean][4]** Set this to `true` to use sequential rather than random access where possible.
+         This can reduce memory usage and might improve performance on some systems. (optional, default `false`)
     -   `options.density` **[Number][5]** number representing the DPI for vector images. (optional, default `72`)
     -   `options.pages` **[Number][5]** number of pages to extract for multi-page input (GIF, TIFF, PDF), use -1 for all pages. (optional, default `1`)
     -   `options.page` **[Number][5]** page number to start extracting from for multi-page input (GIF, TIFF, PDF), zero based. (optional, default `0`)
@@ -67,42 +72,24 @@ sharp({
 
 Returns **[Sharp][8]** 
 
-### format
+## clone
 
-An Object containing nested boolean values representing the available input and output formats/methods.
-
-#### Examples
-
-```javascript
-console.log(sharp.format);
-```
-
-Returns **[Object][3]** 
-
-### versions
-
-An Object containing the version numbers of libvips and its dependencies.
-
-#### Examples
-
-```javascript
-console.log(sharp.versions);
-```
-
-## queue
-
-An EventEmitter that emits a `change` event when a task is either:
-
--   queued, waiting for _libuv_ to provide a worker thread
--   complete
+Take a "snapshot" of the Sharp instance, returning a new instance.
+Cloned instances inherit the input of their parent instance.
+This allows multiple output Streams and therefore multiple processing pipelines to share a single input Stream.
 
 ### Examples
 
 ```javascript
-sharp.queue.on('change', function(queueLength) {
-  console.log('Queue contains ' + queueLength + ' task(s)');
-});
+const pipeline = sharp().rotate();
+pipeline.clone().resize(800, 600).pipe(firstWritableStream);
+pipeline.clone().extract({ left: 20, top: 20, width: 100, height: 100 }).pipe(secondWritableStream);
+readableStream.pipe(pipeline);
+// firstWritableStream receives auto-rotated, resized readableStream
+// secondWritableStream receives auto-rotated, extracted region of readableStream
 ```
+
+Returns **[Sharp][8]** 
 
 [1]: https://nodejs.org/api/buffer.html
 

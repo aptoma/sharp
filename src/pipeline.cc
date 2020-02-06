@@ -1,4 +1,4 @@
-// Copyright 2013, 2014, 2015, 2016, 2017, 2018, 2019 Lovell Fuller and contributors.
+// Copyright 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020 Lovell Fuller and contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,6 +38,9 @@
 #elif defined(__APPLE__)
 #define STAT64_STRUCT stat
 #define STAT64_FUNCTION stat
+#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
+#define STAT64_STRUCT stat
+#define STAT64_FUNCTION stat
 #else
 #define STAT64_STRUCT stat64
 #define STAT64_FUNCTION stat64
@@ -74,15 +77,7 @@ class PipelineWorker : public Nan::AsyncWorker {
       // Open input
       vips::VImage image;
       ImageType inputImageType;
-      std::tie(image, inputImageType) = sharp::OpenInput(baton->input, baton->accessMethod);
-
-      // Limit input images to a given number of pixels, where pixels = width * height
-      // Ignore if 0
-      if (baton->limitInputPixels > 0 &&
-        static_cast<uint64_t>(image.width() * image.height()) > static_cast<uint64_t>(baton->limitInputPixels)) {
-        (baton->err).append("Input image exceeds pixel limit");
-        return Error();
-      }
+      std::tie(image, inputImageType) = sharp::OpenInput(baton->input);
 
       // Calculate angle of rotation
       VipsAngle rotation;
@@ -101,7 +96,7 @@ class PipelineWorker : public Nan::AsyncWorker {
       if (baton->rotateBeforePreExtract) {
         if (rotation != VIPS_ANGLE_D0) {
           image = image.rot(rotation);
-          sharp::RemoveExifOrientation(image);
+          image = sharp::RemoveExifOrientation(image);
         }
         if (baton->rotationAngle != 0.0) {
           std::vector<double> background;
@@ -129,6 +124,17 @@ class PipelineWorker : public Nan::AsyncWorker {
         (rotation == VIPS_ANGLE_D90 || rotation == VIPS_ANGLE_D270)) {
         // Swap input output width and height when rotating by 90 or 270 degrees
         std::swap(inputWidth, inputHeight);
+      }
+
+      // If withoutEnlargement is specified,
+      // Override target width and height if exceeds respective value from input file
+      if (baton->withoutEnlargement) {
+        if (baton->width > inputWidth) {
+          baton->width = inputWidth;
+        }
+        if (baton->height > inputHeight) {
+          baton->height = inputHeight;
+        }
       }
 
       // Scaling calculations
@@ -218,21 +224,6 @@ class PipelineWorker : public Nan::AsyncWorker {
       double xresidual = static_cast<double>(xshrink) / xfactor;
       double yresidual = static_cast<double>(yshrink) / yfactor;
 
-      // Do not enlarge the output if the input width *or* height
-      // are already less than the required dimensions
-      if (baton->withoutEnlargement) {
-        if (inputWidth < baton->width || inputHeight < baton->height) {
-          xfactor = 1.0;
-          yfactor = 1.0;
-          xshrink = 1;
-          yshrink = 1;
-          xresidual = 1.0;
-          yresidual = 1.0;
-          baton->width = inputWidth;
-          baton->height = inputHeight;
-        }
-      }
-
       // If integral x and y shrink are equal, try to use shrink-on-load for JPEG and WebP,
       // but not when applying gamma correction, pre-resize extract or trim
       int shrink_on_load = 1;
@@ -271,7 +262,7 @@ class PipelineWorker : public Nan::AsyncWorker {
       if (shrink_on_load > 1) {
         // Reload input using shrink-on-load
         vips::VOption *option = VImage::option()
-          ->set("access", baton->accessMethod)
+          ->set("access", baton->input->access)
           ->set("shrink", shrink_on_load)
           ->set("fail", baton->input->failOnError);
         if (baton->input->buffer != nullptr) {
@@ -403,20 +394,20 @@ class PipelineWorker : public Nan::AsyncWorker {
       // Rotate post-extract 90-angle
       if (!baton->rotateBeforePreExtract &&  rotation != VIPS_ANGLE_D0) {
           image = image.rot(rotation);
-          sharp::RemoveExifOrientation(image);
+          image = sharp::RemoveExifOrientation(image);
       }
 
 
       // Flip (mirror about Y axis)
       if (baton->flip) {
         image = image.flip(VIPS_DIRECTION_VERTICAL);
-        sharp::RemoveExifOrientation(image);
+        image = sharp::RemoveExifOrientation(image);
       }
 
       // Flop (mirror about X axis)
       if (baton->flop) {
         image = image.flip(VIPS_DIRECTION_HORIZONTAL);
-        sharp::RemoveExifOrientation(image);
+        image = sharp::RemoveExifOrientation(image);
       }
 
       // Join additional color channels to the image
@@ -425,7 +416,7 @@ class PipelineWorker : public Nan::AsyncWorker {
         ImageType joinImageType = ImageType::UNKNOWN;
 
         for (unsigned int i = 0; i < baton->joinChannelIn.size(); i++) {
-          std::tie(joinImage, joinImageType) = sharp::OpenInput(baton->joinChannelIn[i], baton->accessMethod);
+          std::tie(joinImage, joinImageType) = sharp::OpenInput(baton->joinChannelIn[i]);
           image = image.bandjoin(joinImage);
         }
         image = image.copy(VImage::option()->set("interpretation", baton->colourspace));
@@ -478,7 +469,7 @@ class PipelineWorker : public Nan::AsyncWorker {
               baton->height = image.height();
             }
             image = image.tilecache(VImage::option()
-              ->set("access", baton->accessMethod)
+              ->set("access", VIPS_ACCESS_RANDOM)
               ->set("threaded", TRUE));
             image = image.smartcrop(baton->width, baton->height, VImage::option()
               ->set("interesting", baton->position == 16 ? VIPS_INTERESTING_ENTROPY : VIPS_INTERESTING_ATTENTION));
@@ -555,7 +546,7 @@ class PipelineWorker : public Nan::AsyncWorker {
         for (Composite *composite : baton->composite) {
           VImage compositeImage;
           ImageType compositeImageType = ImageType::UNKNOWN;
-          std::tie(compositeImage, compositeImageType) = OpenInput(composite->input, baton->accessMethod);
+          std::tie(compositeImage, compositeImageType) = OpenInput(composite->input);
           // Verify within current dimensions
           if (compositeImage.width() > image.width() || compositeImage.height() > image.height()) {
             throw vips::VError("Image to composite must have same dimensions or smaller");
@@ -645,7 +636,7 @@ class PipelineWorker : public Nan::AsyncWorker {
       if (baton->boolean != nullptr) {
         VImage booleanImage;
         ImageType booleanImageType = ImageType::UNKNOWN;
-        std::tie(booleanImage, booleanImageType) = sharp::OpenInput(baton->boolean, baton->accessMethod);
+        std::tie(booleanImage, booleanImageType) = sharp::OpenInput(baton->boolean);
         image = sharp::Boolean(image, booleanImage, baton->booleanOp);
       }
 
@@ -699,7 +690,7 @@ class PipelineWorker : public Nan::AsyncWorker {
 
       // Override EXIF Orientation tag
       if (baton->withMetadata && baton->withMetadataOrientation != -1) {
-        sharp::SetExifOrientation(image, baton->withMetadataOrientation);
+        image = sharp::SetExifOrientation(image, baton->withMetadataOrientation);
       }
 
       // Number of channels used in output image
@@ -911,11 +902,9 @@ class PipelineWorker : public Nan::AsyncWorker {
         } else if (baton->formatOut == "heif" || (mightMatchInput && isHeif) ||
           (willMatchInput && inputImageType == ImageType::HEIF)) {
           // Write HEIF to file
-          #ifdef VIPS_TYPE_FOREIGN_HEIF_COMPRESSION
           if (sharp::IsAvif(baton->fileOut)) {
             baton->heifCompression = VIPS_FOREIGN_HEIF_COMPRESSION_AV1;
           }
-          #endif
           image.heifsave(const_cast<char*>(baton->fileOut.data()), VImage::option()
             ->set("strip", !baton->withMetadata)
             ->set("Q", baton->heifQuality)
@@ -961,23 +950,26 @@ class PipelineWorker : public Nan::AsyncWorker {
             };
             suffix = AssembleSuffixString(extname, options);
           }
+          // Remove alpha channel from tile background if image does not contain an alpha channel
+          if (!HasAlpha(image)) {
+            baton->tileBackground.pop_back();
+          }
           // Write DZ to file
           vips::VOption *options = VImage::option()
-                                       ->set("strip", !baton->withMetadata)
-                                       ->set("tile_size", baton->tileSize)
-                                       ->set("overlap", baton->tileOverlap)
-                                       ->set("container", baton->tileContainer)
-                                       ->set("layout", baton->tileLayout)
-                                       ->set("suffix", const_cast<char*>(suffix.data()))
-                                       ->set("angle", CalculateAngleRotation(baton->tileAngle))
-                                       ->set("skip_blanks", baton->tileSkipBlanks);
-
+            ->set("strip", !baton->withMetadata)
+            ->set("tile_size", baton->tileSize)
+            ->set("overlap", baton->tileOverlap)
+            ->set("container", baton->tileContainer)
+            ->set("layout", baton->tileLayout)
+            ->set("suffix", const_cast<char*>(suffix.data()))
+            ->set("angle", CalculateAngleRotation(baton->tileAngle))
+            ->set("background", baton->tileBackground)
+            ->set("skip_blanks", baton->tileSkipBlanks);
           // libvips chooses a default depth based on layout. Instead of replicating that logic here by
           // not passing anything - libvips will handle choice
           if (baton->tileDepth < VIPS_FOREIGN_DZ_DEPTH_LAST) {
             options->set("depth", baton->tileDepth);
           }
-
           image.dzsave(const_cast<char*>(baton->fileOut.data()), options);
           baton->formatOut = "dz";
         } else if (baton->formatOut == "v" || (mightMatchInput && isV) ||
@@ -993,7 +985,12 @@ class PipelineWorker : public Nan::AsyncWorker {
         }
       }
     } catch (vips::VError const &err) {
-      (baton->err).append(err.what());
+      char const *what = err.what();
+      if (what && what[0]) {
+        (baton->err).append(what);
+      } else {
+        (baton->err).append("Unknown error");
+      }
     }
     // Clean up libvips' per-request data and threads
     vips_error_clear();
@@ -1186,10 +1183,6 @@ NAN_METHOD(pipeline) {
 
   // Input
   baton->input = CreateInputDescriptor(AttrAs<v8::Object>(options, "input"), buffersToPersist);
-  baton->accessMethod = AttrTo<bool>(options, "sequentialRead") ?
-    VIPS_ACCESS_SEQUENTIAL : VIPS_ACCESS_RANDOM;
-  // Limit input images to a given number of pixels, where pixels = width * height
-  baton->limitInputPixels = AttrTo<int32_t>(options, "limitInputPixels");
   // Extract image options
   baton->topOffsetPre = AttrTo<int32_t>(options, "topOffsetPre");
   baton->leftOffsetPre = AttrTo<int32_t>(options, "leftOffsetPre");
@@ -1366,16 +1359,15 @@ NAN_METHOD(pipeline) {
     AttrAsStr(options, "tiffPredictor").data()));
   baton->heifQuality = AttrTo<uint32_t>(options, "heifQuality");
   baton->heifLossless = AttrTo<bool>(options, "heifLossless");
-  #ifdef VIPS_TYPE_FOREIGN_HEIF_COMPRESSION
   baton->heifCompression = static_cast<VipsForeignHeifCompression>(
   vips_enum_from_nick(nullptr, VIPS_TYPE_FOREIGN_HEIF_COMPRESSION,
     AttrAsStr(options, "heifCompression").data()));
-  #endif
   // Tile output
   baton->tileSize = AttrTo<uint32_t>(options, "tileSize");
   baton->tileOverlap = AttrTo<uint32_t>(options, "tileOverlap");
   std::string tileContainer = AttrAsStr(options, "tileContainer");
   baton->tileAngle = AttrTo<int32_t>(options, "tileAngle");
+  baton->tileBackground = AttrAsRgba(options, "tileBackground");
   baton->tileSkipBlanks = AttrTo<int32_t>(options, "tileSkipBlanks");
   if (tileContainer == "zip") {
     baton->tileContainer = VIPS_FOREIGN_DZ_CONTAINER_ZIP;
@@ -1402,11 +1394,17 @@ NAN_METHOD(pipeline) {
     // signal that we do not want to pass any value to dzSave
     baton->tileDepth = VIPS_FOREIGN_DZ_DEPTH_LAST;
   }
+
   // Force random access for certain operations
-  if (baton->accessMethod == VIPS_ACCESS_SEQUENTIAL && (
-    baton->trimThreshold > 0.0 || baton->normalise ||
-    baton->position == 16 || baton->position == 17)) {
-    baton->accessMethod = VIPS_ACCESS_RANDOM;
+  if (baton->input->access == VIPS_ACCESS_SEQUENTIAL) {
+    if (
+      baton->trimThreshold > 0.0 ||
+      baton->normalise ||
+      baton->position == 16 || baton->position == 17 ||
+      baton->angle != 0 || baton->rotationAngle != 0.0
+    ) {
+      baton->input->access = VIPS_ACCESS_RANDOM;
+    }
   }
 
   // Function to notify of libvips warnings

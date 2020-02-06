@@ -1,6 +1,6 @@
 # sharp
 
-<img src="image/sharp-logo.svg" width="160" height="160" alt="sharp logo" align="right">
+<img src="https://raw.githubusercontent.com/lovell/sharp/master/docs/image/sharp-logo.svg?sanitize=true" width="160" height="160" alt="sharp logo" align="right">
 
 The typical use case for this high speed Node.js module
 is to convert large images in common formats to
@@ -16,8 +16,8 @@ Lanczos resampling ensures quality is not sacrificed for speed.
 As well as image resizing, operations such as
 rotation, extraction, compositing and gamma correction are available.
 
-Most modern 64-bit OS X, Windows and Linux systems running
-Node versions 8, 10 and 12
+Most modern 64-bit macOS, Windows and Linux systems running
+Node versions 10, 12 and 13
 do not require any additional install or runtime dependencies.
 
 [![Test Coverage](https://coveralls.io/repos/lovell/sharp/badge.png?branch=master)](https://coveralls.io/r/lovell/sharp?branch=master)
@@ -34,15 +34,14 @@ A single input Stream can be split into multiple processing pipelines and output
 
 Deep Zoom image pyramids can be generated,
 suitable for use with "slippy map" tile viewers like
-[OpenSeadragon](https://github.com/openseadragon/openseadragon)
-and [Leaflet](https://github.com/turban/Leaflet.Zoomify).
+[OpenSeadragon](https://github.com/openseadragon/openseadragon).
 
 ### Fast
 
 This module is powered by the blazingly fast
 [libvips](https://github.com/libvips/libvips) image processing library,
 originally created in 1989 at Birkbeck College
-and currently maintained by
+and currently maintained by a small team led by
 [John Cupitt](https://github.com/jcupitt).
 
 Only small regions of uncompressed image data
@@ -128,12 +127,16 @@ the help and code contributions of the following people:
 * [Jakub Michálek](https://github.com/Goues)
 * [Ilya Ovdin](https://github.com/iovdin)
 * [Andargor](https://github.com/Andargor)
+* [Nicolas Stepien](https://github.com/MayhemYDG)
+* [Paul Neave](https://github.com/neave)
+* [Brendan Kennedy](https://github.com/rustyguts)
+* [Brychan Bennett-Odlum](https://github.com/BrychanOdlum)
 
 Thank you!
 
 ### Licensing
 
-Copyright 2013, 2014, 2015, 2016, 2017, 2018, 2019 Lovell Fuller and contributors.
+Copyright 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020 Lovell Fuller and contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

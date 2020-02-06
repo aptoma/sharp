@@ -1,4 +1,4 @@
-// Copyright 2013, 2014, 2015, 2016, 2017, 2018, 2019 Lovell Fuller and contributors.
+// Copyright 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020 Lovell Fuller and contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 #include <string.h>
 #include <vector>
 #include <queue>
-#include <mutex>
+#include <mutex>  // NOLINT(build/c++11)
 
 #include <node.h>
 #include <node_buffer.h>
@@ -58,6 +58,7 @@ namespace sharp {
       v8::Local<v8::Object> buffer = AttrAs<v8::Object>(input, "buffer");
       descriptor->bufferLength = node::Buffer::Length(buffer);
       descriptor->buffer = node::Buffer::Data(buffer);
+      descriptor->isBuffer = TRUE;
       buffersToPersist.push_back(buffer);
     }
     descriptor->failOnError = AttrTo<bool>(input, "failOnError");
@@ -85,6 +86,10 @@ namespace sharp {
       descriptor->createHeight = AttrTo<uint32_t>(input, "createHeight");
       descriptor->createBackground = AttrAsRgba(input, "createBackground");
     }
+    // Limit input images to a given number of pixels, where pixels = width * height
+    descriptor->limitInputPixels = AttrTo<uint32_t>(input, "limitInputPixels");
+    // Allow switch from random to sequential access
+    descriptor->access = AttrTo<bool>(input, "sequentialRead") ? VIPS_ACCESS_SEQUENTIAL : VIPS_ACCESS_RANDOM;
     return descriptor;
   }
 
@@ -196,7 +201,7 @@ namespace sharp {
       std::string const loader = load;
       if (EndsWith(loader, "JpegFile")) {
         imageType = ImageType::JPEG;
-      } else if (EndsWith(loader, "Png")) {
+      } else if (EndsWith(loader, "PngFile")) {
         imageType = ImageType::PNG;
       } else if (EndsWith(loader, "WebpFile")) {
         imageType = ImageType::WEBP;
@@ -243,10 +248,10 @@ namespace sharp {
   /*
     Open an image from the given InputDescriptor (filesystem, compressed buffer, raw pixel data)
   */
-  std::tuple<VImage, ImageType> OpenInput(InputDescriptor *descriptor, VipsAccess accessMethod) {
+  std::tuple<VImage, ImageType> OpenInput(InputDescriptor *descriptor) {
     VImage image;
     ImageType imageType;
-    if (descriptor->buffer != nullptr) {
+    if (descriptor->isBuffer) {
       if (descriptor->rawChannels > 0) {
         // Raw, uncompressed pixel data
         image = VImage::new_from_memory(descriptor->buffer, descriptor->bufferLength,
@@ -263,7 +268,7 @@ namespace sharp {
         if (imageType != ImageType::UNKNOWN) {
           try {
             vips::VOption *option = VImage::option()
-              ->set("access", accessMethod)
+              ->set("access", descriptor->access)
               ->set("fail", descriptor->failOnError);
             if (imageType == ImageType::SVG || imageType == ImageType::PDF) {
               option->set("dpi", descriptor->density);
@@ -277,7 +282,7 @@ namespace sharp {
             }
             image = VImage::new_from_buffer(descriptor->buffer, descriptor->bufferLength, nullptr, option);
             if (imageType == ImageType::SVG || imageType == ImageType::PDF || imageType == ImageType::MAGICK) {
-              SetDensity(image, descriptor->density);
+              image = SetDensity(image, descriptor->density);
             }
           } catch (vips::VError const &err) {
             throw vips::VError(std::string("Input buffer has corrupt header: ") + err.what());
@@ -309,7 +314,7 @@ namespace sharp {
         if (imageType != ImageType::UNKNOWN) {
           try {
             vips::VOption *option = VImage::option()
-              ->set("access", accessMethod)
+              ->set("access", descriptor->access)
               ->set("fail", descriptor->failOnError);
             if (imageType == ImageType::SVG || imageType == ImageType::PDF) {
               option->set("dpi", descriptor->density);
@@ -323,7 +328,7 @@ namespace sharp {
             }
             image = VImage::new_from_file(descriptor->file.data(), option);
             if (imageType == ImageType::SVG || imageType == ImageType::PDF || imageType == ImageType::MAGICK) {
-              SetDensity(image, descriptor->density);
+              image = SetDensity(image, descriptor->density);
             }
           } catch (vips::VError const &err) {
             throw vips::VError(std::string("Input file has corrupt header: ") + err.what());
@@ -332,6 +337,11 @@ namespace sharp {
           throw vips::VError("Input file contains unsupported image format");
         }
       }
+    }
+    // Limit input images to a given number of pixels, where pixels = width * height
+    if (descriptor->limitInputPixels > 0 &&
+      static_cast<uint64_t>(image.width() * image.height()) > static_cast<uint64_t>(descriptor->limitInputPixels)) {
+      throw vips::VError("Input image exceeds pixel limit");
     }
     return std::make_tuple(image, imageType);
   }
@@ -370,15 +380,19 @@ namespace sharp {
   /*
     Set EXIF Orientation of image.
   */
-  void SetExifOrientation(VImage image, int const orientation) {
-    image.set(VIPS_META_ORIENTATION, orientation);
+  VImage SetExifOrientation(VImage image, int const orientation) {
+    VImage copy = image.copy();
+    copy.set(VIPS_META_ORIENTATION, orientation);
+    return copy;
   }
 
   /*
     Remove EXIF Orientation from image.
   */
-  void RemoveExifOrientation(VImage image) {
-    vips_image_remove(image.get_image(), VIPS_META_ORIENTATION);
+  VImage RemoveExifOrientation(VImage image) {
+    VImage copy = image.copy();
+    copy.remove(VIPS_META_ORIENTATION);
+    return copy;
   }
 
   /*
@@ -398,11 +412,13 @@ namespace sharp {
   /*
     Set pixels/mm resolution based on a pixels/inch density.
   */
-  void SetDensity(VImage image, const double density) {
+  VImage SetDensity(VImage image, const double density) {
     const double pixelsPerMm = density / 25.4;
-    image.set("Xres", pixelsPerMm);
-    image.set("Yres", pixelsPerMm);
-    image.set(VIPS_META_RESOLUTION_UNIT, "in");
+    VImage copy = image.copy();
+    copy.set("Xres", pixelsPerMm);
+    copy.set("Yres", pixelsPerMm);
+    copy.set(VIPS_META_RESOLUTION_UNIT, "in");
+    return copy;
   }
 
   /*
