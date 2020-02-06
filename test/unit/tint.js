@@ -87,7 +87,7 @@ describe('Tint', function () {
       });
   });
 
-  it('tints cmyk image red', function (done) {
+  it.skip('tints cmyk image red', function (done) {
     const output = fixtures.path('output.tint-cmyk.jpg');
     sharp(fixtures.inputJpgWithCmykProfile)
       .resize(320, 240, { fastShrinkOnLoad: false })
