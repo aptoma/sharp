@@ -622,4 +622,22 @@ describe('Resize dimensions', function () {
       sharp().resize(null, null, { position: 'unknown' });
     });
   });
+
+  it('retains profile', async () => {
+    const output = fixtures.path('output.cmyk-profile.jpg');
+    let transformer = sharp(fixtures.inputJpgWithCmykProfile);
+    const metadata = await transformer.metadata();
+    transformer = transformer.toColourspace(metadata.space);
+
+    await transformer
+      .resize(200, 200)
+      .withMetadata()
+      .toFile(output);
+
+    const info = await sharp(output).metadata();
+
+    assert.strictEqual(metadata.space, 'cmyk');
+    assert.strictEqual(metadata.space, info.space);
+    assert(metadata.icc.equals(info.icc));
+  });
 });
