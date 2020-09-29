@@ -41,6 +41,21 @@ describe('Trim borders', function () {
       });
   });
 
+  it('single colour PNG where alpha channel provides the image', () =>
+    sharp(fixtures.inputPngImageInAlpha)
+      .trim()
+      .toBuffer({ resolveWithObject: true })
+      .then(({ data, info }) => {
+        assert.strictEqual(true, data.length > 0);
+        assert.strictEqual('png', info.format);
+        assert.strictEqual(916, info.width);
+        assert.strictEqual(137, info.height);
+        assert.strictEqual(4, info.channels);
+        assert.strictEqual(-6, info.trimOffsetLeft);
+        assert.strictEqual(-20, info.trimOffsetTop);
+      })
+  );
+
   it('16-bit PNG with alpha channel', function (done) {
     sharp(fixtures.inputPngWithTransparency16bit)
       .resize(32, 32)
@@ -78,6 +93,32 @@ describe('Trim borders', function () {
       })
       .catch(done);
   });
+
+  it('should rotate before trim', () =>
+    sharp({
+      create: {
+        width: 20,
+        height: 30,
+        channels: 3,
+        background: 'white'
+      }
+    })
+      .rotate(30)
+      .png()
+      .toBuffer()
+      .then(rotated30 =>
+        sharp(rotated30)
+          .rotate(-30)
+          .trim(128)
+          .toBuffer({ resolveWithObject: true })
+          .then(({ info }) => {
+            assert.strictEqual(20, info.width);
+            assert.strictEqual(31, info.height);
+            assert.strictEqual(-8, info.trimOffsetTop);
+            assert.strictEqual(-13, info.trimOffsetLeft);
+          })
+      )
+  );
 
   describe('Invalid thresholds', function () {
     [-1, 'fail', {}].forEach(function (threshold) {

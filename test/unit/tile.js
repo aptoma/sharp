@@ -91,6 +91,29 @@ const assertGoogleTiles = function (directory, expectedTileSize, expectedLevels,
   });
 };
 
+// Verifies tiles at specified level in a given output directory are > size+overlap
+const assertTileOverlap = function (directory, tileSize, done) {
+  // Get sorted levels
+  const levels = fs.readdirSync(directory).sort((a, b) => a - b);
+  // Select the highest tile level
+  const highestLevel = levels[levels.length - 1];
+  // Get sorted tiles from greatest level
+  const tiles = fs.readdirSync(path.join(directory, highestLevel)).sort();
+  // Select a tile from the approximate center of the image
+  const squareTile = path.join(directory, highestLevel, tiles[Math.floor(tiles.length / 2)]);
+
+  sharp(squareTile).metadata(function (err, metadata) {
+    if (err) {
+      throw err;
+    } else {
+      // Tile with an overlap should be larger than original size
+      assert.strictEqual(true, metadata.width > tileSize);
+      assert.strictEqual(true, metadata.height > tileSize);
+      done();
+    }
+  });
+};
+
 describe('Tile', function () {
   it('Valid size values pass', function () {
     [1, 8192].forEach(function (size) {
@@ -297,7 +320,9 @@ describe('Tile', function () {
           assert.strictEqual(2225, info.height);
           assert.strictEqual(3, info.channels);
           assert.strictEqual('undefined', typeof info.size);
-          assertDeepZoomTiles(directory, 512 + (2 * 16), 13, done);
+          assertDeepZoomTiles(directory, 512 + (2 * 16), 13, function () {
+            assertTileOverlap(directory, 512, done);
+          });
         });
     });
   });
@@ -736,6 +761,30 @@ describe('Tile', function () {
           assert.strictEqual('number', typeof info.size);
 
           assertGoogleTiles(directory, 256, 5, done);
+        });
+    });
+  });
+
+  it('IIIF layout', function (done) {
+    const directory = fixtures.path('output.iiif.info');
+    rimraf(directory, function () {
+      sharp(fixtures.inputJpg)
+        .tile({
+          layout: 'iiif'
+        })
+        .toFile(directory, function (err, info) {
+          if (err) throw err;
+          assert.strictEqual('dz', info.format);
+          assert.strictEqual(2725, info.width);
+          assert.strictEqual(2225, info.height);
+          assert.strictEqual(3, info.channels);
+          assert.strictEqual('number', typeof info.size);
+          fs.stat(path.join(directory, '0,0,256,256', '256,', '0', 'default.jpg'), function (err, stat) {
+            if (err) throw err;
+            assert.strictEqual(true, stat.isFile());
+            assert.strictEqual(true, stat.size > 0);
+            done();
+          });
         });
     });
   });

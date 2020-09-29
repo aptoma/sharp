@@ -307,6 +307,40 @@ describe('Resize dimensions', function () {
       });
   });
 
+  it('Do crop when fit = cover and withoutEnlargement = true and width >= outputWidth, and height < outputHeight', function (done) {
+    sharp(fixtures.inputJpg)
+      .resize({
+        width: 3000,
+        height: 1000,
+        withoutEnlargement: true
+      })
+      .toBuffer(function (err, data, info) {
+        if (err) throw err;
+        assert.strictEqual(true, data.length > 0);
+        assert.strictEqual('jpeg', info.format);
+        assert.strictEqual(2725, info.width);
+        assert.strictEqual(1000, info.height);
+        done();
+      });
+  });
+
+  it('Do crop when fit = cover and withoutEnlargement = true and width < outputWidth, and height >= outputHeight', function (done) {
+    sharp(fixtures.inputJpg)
+      .resize({
+        width: 1500,
+        height: 2226,
+        withoutEnlargement: true
+      })
+      .toBuffer(function (err, data, info) {
+        if (err) throw err;
+        assert.strictEqual(true, data.length > 0);
+        assert.strictEqual('jpeg', info.format);
+        assert.strictEqual(1500, info.width);
+        assert.strictEqual(2225, info.height);
+        done();
+      });
+  });
+
   it('Do enlarge when input width is less than output width', function (done) {
     sharp(fixtures.inputJpg)
       .resize({
@@ -587,5 +621,23 @@ describe('Resize dimensions', function () {
     assert.throws(function () {
       sharp().resize(null, null, { position: 'unknown' });
     });
+  });
+
+  it('retains profile', async () => {
+    const output = fixtures.path('output.cmyk-profile.jpg');
+    let transformer = sharp(fixtures.inputJpgWithCmykProfile);
+    const metadata = await transformer.metadata();
+    transformer = transformer.toColourspace(metadata.space);
+
+    await transformer
+      .resize(200, 200)
+      .withMetadata()
+      .toFile(output);
+
+    const info = await sharp(output).metadata();
+
+    assert.strictEqual(metadata.space, 'cmyk');
+    assert.strictEqual(metadata.space, info.space);
+    assert(metadata.icc.equals(info.icc));
   });
 });
